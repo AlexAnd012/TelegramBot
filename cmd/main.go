@@ -37,7 +37,7 @@ func main() {
 
 	for update := range updates {
 		log.Printf("update: %#v", update)
-		if update.Message != nil {
+		if update.Message == nil {
 			continue
 		}
 		msg := BotApi.NewMessage(update.Message.Chat.ID, "hi")
