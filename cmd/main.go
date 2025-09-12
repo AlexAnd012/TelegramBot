@@ -20,22 +20,25 @@ func main() {
 
 	webhook, err := BotApi.NewWebhook(cfg.SelfURL + "/webhook")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("new webhook: %v", err)
 	}
 	resp, err := bot.Request(webhook)
 	if err != nil || !resp.Ok {
-		log.Fatal(err)
+		log.Fatalf("setWebhook failed: err=%v ok=%v desc=%s", err, resp.Ok, resp.Description)
 	}
+	log.Printf("Webhook set to %s/webhook", cfg.SelfURL)
 
 	updates := bot.ListenForWebhook("/webhook")
+	log.Printf("HTTP server listening on :%s", cfg.Port)
 
-	// позже заменить на порт от render
-
-	if err := http.ListenAndServe(":"+cfg.Port, nil); err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		if err := http.ListenAndServe(":"+cfg.Port, nil); err != nil {
+			log.Fatalf("http server error: %v", err)
+		}
+	}()
 
 	for update := range updates {
+		log.Printf("update: %#v", update)
 		if update.Message != nil {
 			continue
 		}
