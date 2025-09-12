@@ -31,11 +31,9 @@ func main() {
 	updates := bot.ListenForWebhook("/webhook")
 	log.Printf("HTTP server listening on :%s", cfg.Port)
 
-	go func() {
-		if err := http.ListenAndServe(":"+cfg.Port, nil); err != nil {
-			log.Fatalf("http server error: %v", err)
-		}
-	}()
+	if err := http.ListenAndServe(":"+cfg.Port, nil); err != nil {
+		log.Fatalf("http server error: %v", err)
+	}
 
 	for update := range updates {
 		log.Printf("update: %#v", update)
