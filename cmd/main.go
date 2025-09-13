@@ -42,7 +42,7 @@ func main() {
 		if update.Message == nil {
 			continue
 		}
-		msg := BotApi.NewMessage(update.Message.Chat.ID, "привет, артем , я искусственный интелект , я знаю про тебя все")
+		msg := BotApi.NewMessage(update.Message.Chat.ID, "привет")
 		if _, err := bot.Send(msg); err != nil {
 			log.Printf("send error: %v", err)
 		}
