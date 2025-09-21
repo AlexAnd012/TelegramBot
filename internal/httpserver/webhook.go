@@ -3,6 +3,7 @@ package httpserver
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 
 	BotApi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -42,7 +43,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go func(b []byte) {
 		var upd BotApi.Update
 		if err := json.Unmarshal(b, &upd); err != nil {
-			http.Error(w, "error with Unmarshaling", http.StatusBadRequest)
+			log.Printf("unmarshal error: %v", err)
 			return
 		}
 		h.Updates <- upd

@@ -2,6 +2,7 @@ package main
 
 import (
 	"TelegramBot/internal/config"
+	"TelegramBot/internal/httpserver"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,34 +19,40 @@ func main() {
 	}
 	fmt.Printf("Authorized on account %s\n", bot.Self.UserName)
 
-	webhook, err := BotApi.NewWebhook(cfg.SelfURL + "/webhook")
-	if err != nil {
-		log.Fatalf("new webhook: %v", err)
-	}
+	params := BotApi.Params{}
+	params.AddNonEmpty("url", cfg.SelfURL+"/webhook")
+	params.AddNonEmpty("secret_token", cfg.WebhookSecret)
+	params.AddBool("drop_pending_updates", true)
 
-	resp, err := bot.Request(webhook)
+	resp, err := bot.MakeRequest("setWebhook", params)
 	if err != nil || !resp.Ok {
 		log.Fatalf("setWebhook failed: err=%v ok=%v desc=%s", err, resp.Ok, resp.Description)
 	}
-	log.Printf("Webhook set to %s/webhook", cfg.SelfURL)
 
-	updates := bot.ListenForWebhook("/webhook")
+	updates := make(chan BotApi.Update, 100)
+
+	workers := 2
+	for i := 0; i < workers; i++ {
+		go func(id int) {
+			for update := range updates {
+				HandleUpdate(bot, update)
+			}
+		}(i)
+	}
+	handler := httpserver.New(cfg.WebhookSecret, updates)
+
 	log.Printf("HTTP server listening on :%s", cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
+		log.Fatalf("http server error: %v", err)
+	}
+}
 
-	go func() {
-		if err := http.ListenAndServe(":"+cfg.Port, nil); err != nil {
-			log.Fatalf("http server error: %v", err)
-		}
-	}()
-
-	for update := range updates {
-		log.Printf("update: %#v", update)
-		if update.Message == nil {
-			continue
-		}
-		msg := BotApi.NewMessage(update.Message.Chat.ID, "привет")
-		if _, err := bot.Send(msg); err != nil {
-			log.Printf("send error: %v", err)
-		}
+func HandleUpdate(bot *BotApi.BotAPI, update BotApi.Update) {
+	if update.Message == nil {
+		return
+	}
+	msg := BotApi.NewMessage(update.Message.Chat.ID, "привет")
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("send error: %v", err)
 	}
 }
