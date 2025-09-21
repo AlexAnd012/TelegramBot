@@ -22,6 +22,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("new webhook: %v", err)
 	}
+
 	resp, err := bot.Request(webhook)
 	if err != nil || !resp.Ok {
 		log.Fatalf("setWebhook failed: err=%v ok=%v desc=%s", err, resp.Ok, resp.Description)

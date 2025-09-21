@@ -10,7 +10,7 @@ type Config struct {
 	SelfURL       string
 	DBUrl         string
 	TimeZone      string
-	WebHookSecret string
+	WebhookSecret string
 	Port          string
 }
 
@@ -20,7 +20,7 @@ func Load() Config {
 		SelfURL:       os.Getenv("SELF_URL"),
 		DBUrl:         os.Getenv("DATABASE_URL"),
 		TimeZone:      os.Getenv("TIMEZONE"),
-		WebHookSecret: os.Getenv("TG_WEBHOOK_SECRET"),
+		WebhookSecret: os.Getenv("TG_WEBHOOK_SECRET"),
 		Port:          os.Getenv("PORT"),
 	}
 
@@ -36,7 +36,7 @@ func Load() Config {
 	if cfg.TimeZone == "" {
 		log.Fatal("TimeZone is empty")
 	}
-	if cfg.WebHookSecret == "" {
+	if cfg.WebhookSecret == "" {
 		log.Fatal("WebHookSecret is empty")
 	}
 
