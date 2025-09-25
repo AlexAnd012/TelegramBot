@@ -15,14 +15,12 @@ type Router struct {
 }
 
 func New(secret string, updates chan<- BotApi.Update) *Router {
-	// Chi
 	router := chi.NewRouter()
 
 	router.Post("/webhook", func(w http.ResponseWriter, r *http.Request) {
 		NewWebhookHandler(secret, updates).ServeHTTP(w, r)
 	})
 
-	//проверяем , живой ли сервер
 	router.Get("/live", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))

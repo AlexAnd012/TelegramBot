@@ -14,9 +14,10 @@ import (
 )
 
 func main() {
-
+	// загрузка конфига
 	cfg := config.Load()
 
+	// проверка запуска бд
 	store, err := storage.New(context.Background(), cfg.DBUrl)
 	if err != nil {
 		log.Fatal(err)
@@ -31,6 +32,16 @@ func main() {
 	}
 	log.Printf("DB OK, now: %s", dbNow.Format(time.RFC3339))
 
+	// проверка настроек бд
+	csRepo := store.ChatSettings()
+	_ = csRepo.UpsertTZ(ctx, 12345, "Europe/Moscow")
+	got, err := csRepo.Get(ctx, 12345)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("chat %d tz=%s", got.ChatID, got.TimeZone)
+
+	// запуска бота
 	bot, err := BotApi.NewBotAPI(cfg.BotToken)
 	if err != nil {
 		log.Fatal(err)
