@@ -3,15 +3,33 @@ package main
 import (
 	"TelegramBot/internal/config"
 	"TelegramBot/internal/httpserver"
+	"TelegramBot/internal/storage"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	BotApi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func main() {
+
 	cfg := config.Load()
+
+	store, err := storage.New(context.Background(), cfg.DBUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer store.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dbNow, err := store.Now(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("DB OK, now: %s", dbNow.Format(time.RFC3339))
 
 	bot, err := BotApi.NewBotAPI(cfg.BotToken)
 	if err != nil {
