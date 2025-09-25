@@ -3,12 +3,9 @@ package main
 import (
 	"TelegramBot/internal/config"
 	"TelegramBot/internal/httpserver"
-	"TelegramBot/internal/storage"
-	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	BotApi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -16,62 +13,6 @@ import (
 func main() {
 	// загрузка конфига
 	cfg := config.Load()
-
-	// проверка запуска бд
-	store, err := storage.New(context.Background(), cfg.DBUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer store.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	dbNow, err := store.Now(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("DB OK, now: %s", dbNow.Format(time.RFC3339))
-
-	/////////////////////////ВРЕМЕННО////////////////////////////
-
-	// проверка настроек бд
-	csRepo := store.ChatSettings()
-	_ = csRepo.UpsertTZ(ctx, 12345, "Europe/Moscow")
-	got, err := csRepo.Get(ctx, 12345)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("chat %d tz=%s", got.ChatID, got.TimeZone)
-	////////////////////////////////
-
-	ptrTime := func(t time.Time) *time.Time { return &t }
-	rem := storage.Reminder{
-		ChatID:       12345,
-		Message:      "Тестовое событие",
-		EventTime:    ptrTime(time.Now().UTC().Add(2 * time.Hour)),
-		ReminderTime: 30,
-	}
-	id, err := store.Reminders().Create(ctx, &rem)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("created reminder id=%d", id)
-
-	list, err := store.Reminders().GetUpcoming(ctx, 12345, time.Now().UTC(), nil, 10)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("upcoming: %d items", len(list))
-	//////////////////////////////////////
-
-	_ = store.Jobs().Create(ctx, id, time.Now().UTC().Add(1*time.Minute))
-
-	due, err := store.Jobs().Due(ctx, time.Now().UTC(), 50)
-	log.Printf("due jobs: %d", len(due))
-
-	/////////////////////////////////////////////
-
-	/////////////////////////ВРЕМЕННО////////////////////////////
 
 	// запуска бота
 	bot, err := BotApi.NewBotAPI(cfg.BotToken)
