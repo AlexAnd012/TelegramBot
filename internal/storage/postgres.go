@@ -167,15 +167,11 @@ WHERE chat_id=$1
 	return out, rows.Err()
 }
 
-// ===== Jobs
-
 type Job struct {
-	ID         int64
-	ReminderID int64
-	ReportTime time.Time
-	SentAt     *time.Time
-
-	// для удобства отправки:
+	ID           int64
+	ReminderID   int64
+	ReportTime   time.Time
+	SentAt       *time.Time
 	ChatID       int64
 	Message      string
 	ReminderTime int
@@ -248,13 +244,11 @@ func (r *jobsPG) Snooze(ctx context.Context, jobID int64, d time.Duration) error
 	return err
 }
 
-// ===== Weekly schedule
-
 type WeeklyEntry struct {
 	ID        int64
 	ChatID    int64
 	Weekday   int
-	StartTime time.Time // использовать только часы/минуты
+	StartTime time.Time
 	EndTime   *time.Time
 	Title     string
 }
