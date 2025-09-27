@@ -18,6 +18,31 @@ func Reply(bot *tgbotapi.BotAPI, chatID int64, text string) {
 		log.Printf("reply send error (chatID=%d): %v", chatID, err)
 	}
 }
+func buildReplyKB() tgbotapi.ReplyKeyboardMarkup {
+	kb := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/list today"),
+			tgbotapi.NewKeyboardButton("/list week"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/report 20:00"),
+			tgbotapi.NewKeyboardButton("/report off"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/timetable show"),
+		),
+	)
+	kb.ResizeKeyboard = true
+	kb.OneTimeKeyboard = false
+	return kb
+}
+
+func showHome(bot *tgbotapi.BotAPI, chatID int64) {
+	msg := tgbotapi.NewMessage(chatID, "Выбери действие или напиши задачу:")
+	kb := buildReplyKB()
+	msg.ReplyMarkup = kb
+	bot.Send(msg)
+}
 
 func HandleMessage(bot *tgbotapi.BotAPI, store *storage.Storage, message *tgbotapi.Message) {
 	chatId := message.Chat.ID
@@ -25,6 +50,7 @@ func HandleMessage(bot *tgbotapi.BotAPI, store *storage.Storage, message *tgbota
 
 	switch {
 	case strings.HasPrefix(text, "/start"):
+		showHome(bot, chatId)
 		Reply(bot, chatId, "Привет! Я — твой персональный помощник и ассистент от Александра.\nУ меня есть несколько команд, которые я могу выполнить:\n• /timezone — установить часовой пояс\n• /report 20:00 — включить ежедневный отчёт \n• /list today | week | all — показать запланированные дела\n• /timetable — задать расписание\nА ещё можно просто написать: «во вторник в 14:00 встреча за 30 минут» и я напомню тебе о ней")
 
 	case strings.HasPrefix(text, "/timezone"):

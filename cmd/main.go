@@ -24,6 +24,16 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("Authorized on account %s\n", bot.Self.UserName)
+	cmds := []tgbotapi.BotCommand{
+		{Command: "start", Description: "Помощь и кнопки"},
+		{Command: "timezone", Description: "Часовой пояс"},
+		{Command: "report", Description: "Ежедневный отчёт (HH:MM | off)"},
+		{Command: "list", Description: "Список: today | week | all"},
+		{Command: "timetable", Description: "Расписание"},
+	}
+	if _, err := bot.Request(tgbotapi.NewSetMyCommands(cmds...)); err != nil {
+		log.Printf("setMyCommands: %v", err)
+	}
 
 	// бд
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
