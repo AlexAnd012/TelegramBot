@@ -7,6 +7,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -15,9 +16,15 @@ import (
 type Notifier struct {
 	Bot   *tgbotapi.BotAPI
 	Store *storage.Storage
+
+	lastDigest map[int64]time.Time
+	mu         sync.Mutex
 }
 
 func (n *Notifier) Run(ctx context.Context) {
+	if n.lastDigest == nil {
+		n.lastDigest = make(map[int64]time.Time)
+	}
 	jobsTicker := time.NewTicker(1 * time.Minute)
 	digestTicker := time.NewTicker(30 * time.Second)
 	defer jobsTicker.Stop()
@@ -79,16 +86,28 @@ func (n *Notifier) processDailyDigests() {
 		if nowLocal.Format("15:04") != ch.Daily.Format("15:04") {
 			continue
 		}
-
+		n.mu.Lock()
+		last, ok := n.lastDigest[ch.ChatID]
+		sameDay := ok && last.In(loc).Year() == nowLocal.Year() &&
+			last.In(loc).YearDay() == nowLocal.YearDay()
+		if sameDay {
+			n.mu.Unlock()
+			continue
+		}
+		n.mu.Unlock()
 		start := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, loc).Add(24 * time.Hour)
 		end := start.Add(24 * time.Hour)
 		sUTC, eUTC := start.UTC(), end.UTC()
 
-		items, _ := n.Store.Reminders().GetUpcoming(ctx, ch.ChatID, sUTC, &eUTC, 100)
-
-		txt := "Завтра:\n"
+		items, err := n.Store.Reminders().GetUpcoming(ctx, ch.ChatID, sUTC, &eUTC, 100)
+		if err != nil {
+			log.Printf("digest fetch error chat=%d: %v", ch.ChatID, err)
+			continue
+		}
+		var b strings.Builder
+		b.WriteString("🗓 Завтра:\n")
 		if len(items) == 0 {
-			txt += "— ничего не запланировано\n"
+			b.WriteString("— ничего не запланировано\n")
 		} else {
 			for _, r := range items {
 				when := "—"
@@ -97,10 +116,19 @@ func (n *Notifier) processDailyDigests() {
 				} else if r.NextReport != nil {
 					when = r.NextReport.In(loc).Format("Mon, 02 Jan 15:04")
 				}
-				txt += fmt.Sprintf("• %s — %s\n", when, r.Message)
+				fmt.Fprintf(&b, "• %s — %s\n", when, r.Message)
 			}
 		}
-		_, _ = n.Bot.Send(tgbotapi.NewMessage(ch.ChatID, txt))
+
+		if _, err := n.Bot.Send(tgbotapi.NewMessage(ch.ChatID, b.String())); err != nil {
+			log.Printf("digest send error chat=%d: %v", ch.ChatID, err)
+			continue
+		}
+		n.mu.Lock()
+		n.lastDigest[ch.ChatID] = nowLocal
+		n.mu.Unlock()
+
+		log.Printf("digest sent chat=%d tz=%s at %s", ch.ChatID, ch.TimeZone, nowLocal.Format(time.RFC3339))
 	}
 }
 
