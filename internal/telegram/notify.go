@@ -76,28 +76,29 @@ func (n *Notifier) processDailyDigests() {
 		loc := storage.LoadUserLocation(ch.TimeZone)
 		nowLocal := time.Now().In(loc)
 
+		if nowLocal.Format("15:04") != ch.Daily.Format("15:04") {
+			continue
+		}
+
 		start := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, loc).Add(24 * time.Hour)
 		end := start.Add(24 * time.Hour)
 		sUTC, eUTC := start.UTC(), end.UTC()
 
-		reminders, err := n.Store.Reminders().GetUpcoming(ctx, ch.ChatID, sUTC, &eUTC, 100)
-		if err != nil {
-			log.Printf("digest fetch error chat=%d: %v", ch.ChatID, err)
-			continue
-		}
-		if len(reminders) == 0 {
-			continue
-		}
+		items, _ := n.Store.Reminders().GetUpcoming(ctx, ch.ChatID, sUTC, &eUTC, 100)
 
 		txt := "🗓 Завтра:\n"
-		for _, r := range reminders {
-			when := "—"
-			if r.EventTime != nil {
-				when = r.EventTime.In(loc).Format("Mon, 02 Jan 15:04")
-			} else if r.NextReport != nil {
-				when = r.NextReport.In(loc).Format("Mon, 02 Jan 15:04")
+		if len(items) == 0 {
+			txt += "— ничего не запланировано\n"
+		} else {
+			for _, r := range items {
+				when := "—"
+				if r.EventTime != nil {
+					when = r.EventTime.In(loc).Format("Mon, 02 Jan 15:04")
+				} else if r.NextReport != nil {
+					when = r.NextReport.In(loc).Format("Mon, 02 Jan 15:04")
+				}
+				txt += fmt.Sprintf("• %s — %s\n", when, r.Message)
 			}
-			txt += fmt.Sprintf("• %s — %s\n", when, r.Message)
 		}
 		_, _ = n.Bot.Send(tgbotapi.NewMessage(ch.ChatID, txt))
 	}
