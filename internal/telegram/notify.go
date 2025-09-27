@@ -86,7 +86,7 @@ func (n *Notifier) processDailyDigests() {
 
 		items, _ := n.Store.Reminders().GetUpcoming(ctx, ch.ChatID, sUTC, &eUTC, 100)
 
-		txt := "🗓 Завтра:\n"
+		txt := "Завтра:\n"
 		if len(items) == 0 {
 			txt += "— ничего не запланировано\n"
 		} else {
@@ -115,7 +115,7 @@ func NextFromWeeklyRRULE(rrule, tz string, from time.Time) time.Time {
 	byday := parts["BYDAY"]
 	hour, _ := strconv.Atoi(parts["BYHOUR"])
 	min, _ := strconv.Atoi(parts["BYMINUTE"])
-	want := map[string]time.Weekday{"MO": time.Monday, "TU": time.Tuesday, "WE": time.Wednesday, "TH": time.Thursday, "FR": time.Friday, "SA": time.Saturday, "SU": time.Sunday}[byday]
+	want := map[string]time.Weekday{"ПН": time.Monday, "ВТ": time.Tuesday, "СР": time.Wednesday, "ЧТ": time.Thursday, "ПТ": time.Friday, "СБ": time.Saturday, "ВС": time.Sunday}[byday]
 
 	loc := storage.LoadUserLocation(tz)
 	now := from.In(loc)

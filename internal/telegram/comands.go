@@ -217,14 +217,14 @@ func HandleNaturalReminder(bot *tgbotapi.BotAPI, store *storage.Storage, m *tgbo
 
 	p, err := timeparse.ParseRU(m.Text, tz, time.Now())
 	if err != nil {
-		Reply(bot, chatID, "Не понял дату/время 🙈\nПримеры:\n• 25 сентября 14:00 встреча\n• во вторник 18:00 спортзал\n• /add 2025-09-30 14:00 Встреча")
+		Reply(bot, chatID, "Не понял дату/время \nПримеры:\n• 25 сентября 14:00 встреча\n• во вторник 18:00 спортзал\n• /add 2025-09-30 14:00 Встреча")
 		return
 	}
 
 	if p.DueUTC != nil {
 		id, err := store.Reminders().AddReminder(ctx, chatID, p.Title, p.DueUTC.UTC(), p.LeadMinutes)
 		if err != nil {
-			Reply(bot, chatID, "Не смог сохранить напоминание 😔")
+			Reply(bot, chatID, "Не смог сохранить напоминание ")
 			return
 		}
 		fire := p.DueUTC.Add(-time.Duration(p.LeadMinutes) * time.Minute)
@@ -240,7 +240,7 @@ func HandleNaturalReminder(bot *tgbotapi.BotAPI, store *storage.Storage, m *tgbo
 		next := storage.NextFromWeeklyRRULE(*p.RRULE, tz, time.Now())
 		id, err := store.Reminders().AddRecurring(ctx, chatID, p.Title, p.LeadMinutes, *p.RRULE, next)
 		if err != nil {
-			Reply(bot, chatID, "Не смог сохранить повторяющееся напоминание 😔")
+			Reply(bot, chatID, "Не смог сохранить повторяющееся напоминание ")
 			return
 		}
 		_ = store.Jobs().Create(ctx, id, next.Add(-time.Duration(p.LeadMinutes)*time.Minute))

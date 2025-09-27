@@ -13,7 +13,7 @@ var months = map[string]time.Month{
 	"январ": 1, "феврал": 2, "март": 3, "апрел": 4, "ма": 5, "июн": 6, "июл": 7, "август": 8, "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12,
 }
 var weekdays = map[string]time.Weekday{
-	"пон": time.Monday, "втор": time.Tuesday, "сред": time.Wednesday, "четв": time.Thursday, "пят": time.Friday, "суб": time.Saturday, "воскр": time.Sunday,
+	"пн": time.Monday, "вт": time.Tuesday, "ср": time.Wednesday, "чт": time.Thursday, "пт": time.Friday, "сб": time.Saturday, "вс": time.Sunday,
 }
 
 type Parsed struct {
@@ -46,14 +46,14 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 		}
 	}
 
-	reWD := regexp.MustCompile(`(?i)(пон|втор|сред|четв|пят|суб|воскр).{0,10}(\d{1,2}):(\d{2})`)
+	reWD := regexp.MustCompile(`(?i)(пн|вт|ср|чт|пт|сб|вс).{0,10}(\d{1,2}):(\d{2})`)
 	if m := reWD.FindStringSubmatch(low); len(m) == 4 {
 		wd := weekdays[m[1]]
 		hh := toInt(m[2])
 		mm := toInt(m[3])
 		byday := map[time.Weekday]string{
-			time.Monday: "MO", time.Tuesday: "TU", time.Wednesday: "WE", time.Thursday: "TH",
-			time.Friday: "FR", time.Saturday: "SA", time.Sunday: "SU",
+			time.Monday: "ПН", time.Tuesday: "ВТ", time.Wednesday: "СР", time.Thursday: "ЧТ",
+			time.Friday: "ПТ", time.Saturday: "СБ", time.Sunday: "ВС",
 		}[wd]
 		r := fmt.Sprintf("FREQ=WEEKLY;BYDAY=%s;BYHOUR=%d;BYMINUTE=%d", byday, hh, mm)
 		title := strings.TrimSpace(strings.Replace(low, m[0], "", 1))
