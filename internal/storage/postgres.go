@@ -133,6 +133,8 @@ type RemindersRepo interface {
 	UpdateDue(ctx context.Context, id int64, eventTime time.Time, leadMin int) error
 	UpdateNextReport(ctx context.Context, id int64, t *time.Time) error
 	GetUpcoming(ctx context.Context, chatID int64, from time.Time, to *time.Time, limit int) ([]Reminder, error)
+	AddReminder(ctx context.Context, chatID int64, title string, eventTime time.Time, leadMinutes int) (int64, error)
+	AddRecurring(ctx context.Context, chatID int64, title string, leadMinutes int, rule string, next time.Time) (int64, error)
 }
 
 type remindersPG struct{ db *pgxpool.Pool }
@@ -165,6 +167,25 @@ func (r *remindersPG) UpdateNextReport(ctx context.Context, id int64, t *time.Ti
 	const q = `UPDATE reminders SET next_report=$2 WHERE id=$1`
 	_, err := r.db.Exec(ctx, q, id, t)
 	return err
+}
+func (r *remindersPG) AddReminder(ctx context.Context, chatID int64, title string, eventTime time.Time, leadMinutes int) (int64, error) {
+	const q = `
+        INSERT INTO reminders (chat_id, message, event_time, reminder_time)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id`
+	var id int64
+	err := r.db.QueryRow(ctx, q, chatID, title, eventTime, leadMinutes).Scan(&id)
+	return id, err
+}
+
+func (r *remindersPG) AddRecurring(ctx context.Context, chatID int64, title string, leadMinutes int, rule string, next time.Time) (int64, error) {
+	const q = `
+        INSERT INTO reminders (chat_id, message, reminder_time, reminder_rule, next_report)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id`
+	var id int64
+	err := r.db.QueryRow(ctx, q, chatID, title, leadMinutes, rule, next).Scan(&id)
+	return id, err
 }
 
 func (r *remindersPG) GetUpcoming(
@@ -375,7 +396,7 @@ func nilOrTime(t *time.Time) any {
 	return *t
 }
 func LoadUserLocation(tz string) *time.Location {
-	if loc, ok := loadFixedUTC(tz); ok {
+	if loc, ok := LoadFixedUTC(tz); ok {
 		return loc
 	}
 	if l, err := time.LoadLocation(tz); err == nil {
@@ -383,7 +404,7 @@ func LoadUserLocation(tz string) *time.Location {
 	}
 	return time.UTC
 }
-func loadFixedUTC(name string) (*time.Location, bool) {
+func LoadFixedUTC(name string) (*time.Location, bool) {
 	name = strings.TrimSpace(strings.ToUpper(name))
 	if !strings.HasPrefix(name, "UTC") {
 		return nil, false
@@ -415,4 +436,44 @@ func loadFixedUTC(name string) (*time.Location, bool) {
 	}
 	offset := sign * (hh*3600 + mm*60)
 	return time.FixedZone(fmt.Sprintf("UTC%+02d:%02d", sign*hh, mm), offset), true
+}
+
+func NextFromWeeklyRRULE(rrule string, tz string, now time.Time) time.Time {
+	loc := LoadUserLocation(tz)
+	parts := strings.Split(rrule, ";")
+	var weekday time.Weekday
+	var hour, min int
+
+	for _, p := range parts {
+		if strings.HasPrefix(p, "BYDAY=") {
+			switch strings.TrimPrefix(p, "BYDAY=") {
+			case "MO":
+				weekday = time.Monday
+			case "TU":
+				weekday = time.Tuesday
+			case "WE":
+				weekday = time.Wednesday
+			case "TH":
+				weekday = time.Thursday
+			case "FR":
+				weekday = time.Friday
+			case "SA":
+				weekday = time.Saturday
+			case "SU":
+				weekday = time.Sunday
+			}
+		}
+		if strings.HasPrefix(p, "BYHOUR=") {
+			hour, _ = strconv.Atoi(strings.TrimPrefix(p, "BYHOUR="))
+		}
+		if strings.HasPrefix(p, "BYMINUTE=") {
+			min, _ = strconv.Atoi(strings.TrimPrefix(p, "BYMINUTE="))
+		}
+	}
+
+	candidate := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, loc)
+	for candidate.Weekday() != weekday || !candidate.After(now) {
+		candidate = candidate.AddDate(0, 0, 1)
+	}
+	return candidate
 }

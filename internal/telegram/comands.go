@@ -67,7 +67,7 @@ func HandleMessage(bot *tgbotapi.BotAPI, store *storage.Storage, message *tgbota
 		rest := strings.TrimSpace(strings.TrimPrefix(text, "/timetable"))
 		HandleTimetable(bot, store, chatId, rest)
 	default:
-
+		HandleNaturalReminder(bot, store, message)
 	}
 }
 
@@ -76,10 +76,11 @@ func HandleList(bot *tgbotapi.BotAPI, store *storage.Storage, chatID int64, arg 
 	defer cancel()
 
 	cs, _ := store.ChatSettings().Get(ctx, chatID)
-	tz := "UTC"
-	if cs.TimeZone != "" {
-		tz = cs.TimeZone
+	tz := cs.TimeZone
+	if tz == "" {
+		tz = "UTC"
 	}
+
 	loc := storage.LoadUserLocation(tz)
 	now := time.Now().In(loc)
 
@@ -94,7 +95,7 @@ func HandleList(bot *tgbotapi.BotAPI, store *storage.Storage, chatID int64, arg 
 		dow := int(now.Weekday())
 		if dow == 0 {
 			dow = 7
-		}
+		} // 1..7
 		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, -(dow - 1))
 		end := start.AddDate(0, 0, 7)
 		f, t := start.UTC(), end.UTC()
@@ -107,11 +108,16 @@ func HandleList(bot *tgbotapi.BotAPI, store *storage.Storage, chatID int64, arg 
 		return
 	}
 
+	log.Printf("[/list] chat=%d tz=%s arg=%s from=%v to=%v", chatID, tz, arg, fromUTC, toUTC)
+
 	items, err := store.Reminders().GetUpcoming(ctx, chatID, *fromUTC, toUTC, 50)
 	if err != nil {
 		Reply(bot, chatID, "Не удалось получить список")
+		log.Printf("[/list] GetUpcoming error: %v", err)
 		return
 	}
+	log.Printf("[/list] items=%d", len(items))
+
 	if len(items) == 0 {
 		Reply(bot, chatID, "Пусто в выбранном диапазоне")
 		return
@@ -197,4 +203,53 @@ func HandleTimetable(bot *tgbotapi.BotAPI, store *storage.Storage, chatID int64,
 	default:
 		Reply(bot, chatID, "Неизвестная подкоманда. Использование:\n/timetable show | clear | set ...")
 	}
+}
+
+func HandleNaturalReminder(bot *tgbotapi.BotAPI, store *storage.Storage, m *tgbotapi.Message) {
+	chatID := m.Chat.ID
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cs, _ := store.ChatSettings().Get(ctx, chatID)
+	tz := cs.TimeZone
+	if tz == "" {
+		tz = "UTC"
+	}
+
+	p, err := timeparse.ParseRU(m.Text, tz, time.Now())
+	if err != nil {
+		Reply(bot, chatID, "Не понял дату/время 🙈\nПримеры:\n• 25 сентября 14:00 встреча\n• во вторник 18:00 спортзал\n• /add 2025-09-30 14:00 Встреча")
+		return
+	}
+
+	if p.DueUTC != nil {
+		id, err := store.Reminders().AddReminder(ctx, chatID, p.Title, p.DueUTC.UTC(), p.LeadMinutes)
+		if err != nil {
+			Reply(bot, chatID, "Не смог сохранить напоминание 😔")
+			return
+		}
+		fire := p.DueUTC.Add(-time.Duration(p.LeadMinutes) * time.Minute)
+		_ = store.Jobs().Create(ctx, id, fire)
+
+		loc := storage.LoadUserLocation(tz)
+		Reply(bot, chatID, fmt.Sprintf("Ок! Напомню %s — %s",
+			p.DueUTC.In(loc).Format("Mon, 02 Jan 15:04"), p.Title))
+		return
+	}
+
+	if p.RRULE != nil {
+		next := storage.NextFromWeeklyRRULE(*p.RRULE, tz, time.Now())
+		id, err := store.Reminders().AddRecurring(ctx, chatID, p.Title, p.LeadMinutes, *p.RRULE, next)
+		if err != nil {
+			Reply(bot, chatID, "Не смог сохранить повторяющееся напоминание 😔")
+			return
+		}
+		_ = store.Jobs().Create(ctx, id, next.Add(-time.Duration(p.LeadMinutes)*time.Minute))
+
+		loc := storage.LoadUserLocation(tz)
+		Reply(bot, chatID, fmt.Sprintf("Ок! Каждую неделю. Ближайшее: %s — %s",
+			next.In(loc).Format("Mon, 02 Jan 15:04"), p.Title))
+		return
+	}
+
+	Reply(bot, chatID, "Кажется, я не распознал формат. Пример: «25 сентября 14:00 встреча»")
 }
