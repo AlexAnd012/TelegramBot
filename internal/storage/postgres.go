@@ -167,24 +167,33 @@ func (r *remindersPG) UpdateNextReport(ctx context.Context, id int64, t *time.Ti
 	return err
 }
 
-func (r *remindersPG) GetUpcoming(ctx context.Context, chatID int64, from time.Time, to *time.Time, limit int) ([]Reminder, error) {
+func (r *remindersPG) GetUpcoming(
+	ctx context.Context,
+	chatID int64,
+	from time.Time,
+	to *time.Time,
+	limit int,
+) ([]Reminder, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	base := `
 SELECT id, chat_id, message, event_time, reminder_time, reminder_rule, next_report, created_at
 FROM reminders
-WHERE chat_id=$1
+WHERE chat_id = $1
   AND (
-       (event_time IS NOT NULL AND event_time >= $2)
-    OR (next_report IS NOT NULL AND next_report >= $2)
-  )`
+        (event_time  IS NOT NULL AND event_time  >= $2) OR
+        (next_report IS NOT NULL AND next_report >= $2)
+      )`
+
 	args := []any{chatID, from}
+
 	if to != nil {
 		base += ` AND COALESCE(next_report, event_time) <= $3`
 		args = append(args, *to)
 	}
-	base += ` ORDER BY COALESCE(next_report, event_time) LIMIT $4`
+
+	base += ` ORDER BY COALESCE(next_report, event_time) ASC LIMIT $4`
 	args = append(args, limit)
 
 	rows, err := r.db.Query(ctx, base, args...)
