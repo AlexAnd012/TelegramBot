@@ -90,14 +90,14 @@ func (n *Notifier) processDailyDigests() {
 			ch.Daily.Hour(), ch.Daily.Minute(), 0, 0, loc,
 		)
 
+		window := 3 * time.Minute
 		diff := nowLocal.Sub(target)
-		if diff < -3*time.Minute || diff > 3*time.Minute {
+		if diff < -window || diff > window {
 			continue
 		}
-
 		n.mu.Lock()
 		if last, ok := n.lastDigest[ch.ChatID]; ok {
-			if last.In(loc).Year() == nowLocal.Year() && last.In(loc).YearDay() == nowLocal.YearDay() {
+			if last.In(loc).After(target.Add(-window)) && last.In(loc).Before(target.Add(window)) {
 				n.mu.Unlock()
 				continue
 			}
@@ -136,7 +136,7 @@ func (n *Notifier) processDailyDigests() {
 		}
 
 		n.mu.Lock()
-		n.lastDigest[ch.ChatID] = nowLocal
+		n.lastDigest[ch.ChatID] = target
 		n.mu.Unlock()
 
 		log.Printf("digest sent chat=%d tz=%s at %s", ch.ChatID, ch.TimeZone, nowLocal.Format(time.RFC3339))
