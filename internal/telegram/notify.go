@@ -83,18 +83,25 @@ func (n *Notifier) processDailyDigests() {
 		loc := storage.LoadUserLocation(ch.TimeZone)
 		nowLocal := time.Now().In(loc)
 
-		if nowLocal.Format("15:04") != ch.Daily.Format("15:04") {
+		target := time.Date(
+			nowLocal.Year(), nowLocal.Month(), nowLocal.Day(),
+			ch.Daily.Hour(), ch.Daily.Minute(), 0, 0, loc,
+		)
+
+		diff := nowLocal.Sub(target)
+		if diff < -1*time.Minute || diff > 1*time.Minute {
 			continue
 		}
+
 		n.mu.Lock()
-		last, ok := n.lastDigest[ch.ChatID]
-		sameDay := ok && last.In(loc).Year() == nowLocal.Year() &&
-			last.In(loc).YearDay() == nowLocal.YearDay()
-		if sameDay {
-			n.mu.Unlock()
-			continue
+		if last, ok := n.lastDigest[ch.ChatID]; ok {
+			if last.In(loc).Year() == nowLocal.Year() && last.In(loc).YearDay() == nowLocal.YearDay() {
+				n.mu.Unlock()
+				continue
+			}
 		}
 		n.mu.Unlock()
+
 		start := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, loc).Add(24 * time.Hour)
 		end := start.Add(24 * time.Hour)
 		sUTC, eUTC := start.UTC(), end.UTC()
@@ -104,6 +111,7 @@ func (n *Notifier) processDailyDigests() {
 			log.Printf("digest fetch error chat=%d: %v", ch.ChatID, err)
 			continue
 		}
+
 		var b strings.Builder
 		b.WriteString("🗓 Завтра:\n")
 		if len(items) == 0 {
@@ -124,6 +132,7 @@ func (n *Notifier) processDailyDigests() {
 			log.Printf("digest send error chat=%d: %v", ch.ChatID, err)
 			continue
 		}
+
 		n.mu.Lock()
 		n.lastDigest[ch.ChatID] = nowLocal
 		n.mu.Unlock()
