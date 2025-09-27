@@ -21,15 +21,20 @@ func Reply(bot *tgbotapi.BotAPI, chatID int64, text string) {
 func buildReplyKB() tgbotapi.ReplyKeyboardMarkup {
 	kb := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("/timezone Europe/Moscow"),
+			tgbotapi.NewKeyboardButton("/timezone Asia/Krasnoyarsk"),
+		),
+		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("/list today"),
 			tgbotapi.NewKeyboardButton("/list week"),
 		),
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("/report 20:00"),
-			tgbotapi.NewKeyboardButton("/report off"),
+			tgbotapi.NewKeyboardButton("/report 20:00 "),
+			tgbotapi.NewKeyboardButton("/report off "),
 		),
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("/timetable show"),
+			tgbotapi.NewKeyboardButton("/timetable clear"),
 		),
 	)
 	kb.ResizeKeyboard = true
@@ -119,7 +124,6 @@ func HandleList(bot *tgbotapi.BotAPI, store *storage.Storage, chatID int64, arg 
 		dow := int(now.Weekday())
 		if dow == 0 {
 			dow = 7
-		} // 1..7
 		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, -(dow - 1))
 		end := start.AddDate(0, 0, 7)
 		f, t := start.UTC(), end.UTC()
