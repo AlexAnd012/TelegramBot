@@ -135,6 +135,7 @@ type RemindersRepo interface {
 	GetUpcoming(ctx context.Context, chatID int64, from time.Time, to *time.Time, limit int) ([]Reminder, error)
 	AddReminder(ctx context.Context, chatID int64, title string, eventTime time.Time, leadMinutes int) (int64, error)
 	AddRecurring(ctx context.Context, chatID int64, title string, leadMinutes int, rule string, next time.Time) (int64, error)
+	DeleteIfNoPending(ctx context.Context, reminderID int64) error
 }
 
 type remindersPG struct{ db *pgxpool.Pool }
@@ -151,6 +152,22 @@ RETURNING id`
 	var id int64
 	err := r.db.QueryRow(ctx, q, m.ChatID, m.Message, m.EventTime, m.ReminderTime, m.ReminderRule, m.NextReport).Scan(&id)
 	return id, err
+}
+func (r *remindersPG) DeleteIfNoPending(ctx context.Context, reminderID int64) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// удаляем reminder, только если по нему НЕТ НЕотправленных job
+	const q = `
+DELETE FROM reminders rem
+WHERE rem.id = $1
+  AND rem.reminder_rule IS NULL  -- только разовые
+  AND NOT EXISTS (
+        SELECT 1 FROM reminder_jobs j
+        WHERE j.reminder_id = rem.id AND j.sent_at IS NULL
+  )`
+	_, err := r.db.Exec(ctx, q, reminderID)
+	return err
 }
 
 func (r *remindersPG) UpdateDue(ctx context.Context, id int64, eventTime time.Time, leadMin int) error {

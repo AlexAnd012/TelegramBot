@@ -59,6 +59,9 @@ func (n *Notifier) processDueJobs() {
 			continue
 		}
 		_ = n.Store.Jobs().MarkSent(context.Background(), j.ID)
+		if j.ReminderRule == nil || *j.ReminderRule == "" {
+			_ = n.Store.Reminders().DeleteIfNoPending(ctx, j.ReminderID)
+		}
 
 		if j.ReminderRule != nil && *j.ReminderRule != "" {
 			cs, _ := n.Store.ChatSettings().Get(context.Background(), j.ChatID)
