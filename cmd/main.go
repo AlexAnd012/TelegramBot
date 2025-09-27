@@ -58,13 +58,18 @@ func main() {
 			}
 		}(i)
 	}
-	// HTTP сервер с /webhook и /live
+	// запускаем notifier
+	notifier := &telegram.Notifier{Bot: bot, Store: store}
+	go notifier.Run(context.Background())
+
+	// HTTP сервер
 	handler := httpserver.New(cfg.WebhookSecret, updates)
 
 	log.Printf("HTTP server listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
 		log.Fatalf("http server error: %v", err)
 	}
+
 }
 
 func HandleUpdate(bot *BotApi.BotAPI, update BotApi.Update, store *storage.Storage) {

@@ -2,6 +2,9 @@ package storage
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -327,4 +330,46 @@ func nilOrTime(t *time.Time) any {
 		return nil
 	}
 	return *t
+}
+func LoadUserLocation(tz string) *time.Location {
+	if loc, ok := loadFixedUTC(tz); ok {
+		return loc
+	}
+	if l, err := time.LoadLocation(tz); err == nil {
+		return l
+	}
+	return time.UTC
+}
+func loadFixedUTC(name string) (*time.Location, bool) {
+	name = strings.TrimSpace(strings.ToUpper(name))
+	if !strings.HasPrefix(name, "UTC") {
+		return nil, false
+	}
+	rest := strings.TrimPrefix(name, "UTC")
+	if rest == "" || rest == "Z" || rest == "+0" || rest == "+00:00" {
+		return time.UTC, true
+	}
+	sign := 1
+	if strings.HasPrefix(rest, "+") {
+		rest = rest[1:]
+	} else if strings.HasPrefix(rest, "-") {
+		sign = -1
+		rest = rest[1:]
+	} else {
+		return nil, false
+	}
+	ps := strings.SplitN(rest, ":", 2)
+	hh, err := strconv.Atoi(ps[0])
+	if err != nil {
+		return nil, false
+	}
+	mm := 0
+	if len(ps) == 2 {
+		mm, err = strconv.Atoi(ps[1])
+		if err != nil {
+			return nil, false
+		}
+	}
+	offset := sign * (hh*3600 + mm*60)
+	return time.FixedZone(fmt.Sprintf("UTC%+02d:%02d", sign*hh, mm), offset), true
 }
