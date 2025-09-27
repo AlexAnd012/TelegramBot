@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	BotApi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 	cfg := config.Load()
 
 	// запуска бота
-	bot, err := BotApi.NewBotAPI(cfg.BotToken)
+	bot, err := tgbotapi.NewBotAPI(cfg.BotToken)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func main() {
 		log.Fatalf("db ping failed: %v", err)
 	}
 	// webhook
-	params := BotApi.Params{}
+	params := tgbotapi.Params{}
 	params.AddNonEmpty("url", cfg.SelfURL+"/webhook")
 	params.AddNonEmpty("secret_token", cfg.WebhookSecret)
 	params.AddBool("drop_pending_updates", true)
@@ -48,7 +48,7 @@ func main() {
 		log.Fatalf("setWebhook failed: err=%v ok=%v desc=%s", err, resp.Ok, resp.Description)
 	}
 
-	updates := make(chan BotApi.Update, 100)
+	updates := make(chan tgbotapi.Update, 100)
 
 	workers := 2
 	for i := 0; i < workers; i++ {
@@ -72,7 +72,7 @@ func main() {
 
 }
 
-func HandleUpdate(bot *BotApi.BotAPI, update BotApi.Update, store *storage.Storage) {
+func HandleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, store *storage.Storage) {
 	if update.Message != nil {
 		telegram.HandleMessage(bot, store, update.Message)
 		return

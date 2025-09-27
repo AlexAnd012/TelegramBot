@@ -68,9 +68,10 @@ func (n *Notifier) processDailyDigests() {
 
 	chats, err := n.Store.ChatSettings().ChatsToDigestNow(ctx)
 	if err != nil {
-		log.Printf("digest list error: %v", err)
+		log.Printf("digest query error: %v", err)
 		return
 	}
+
 	for _, ch := range chats {
 		loc := storage.LoadUserLocation(ch.TimeZone)
 		nowLocal := time.Now().In(loc)

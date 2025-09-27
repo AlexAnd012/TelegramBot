@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	BotApi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -20,7 +19,7 @@ func Reply(bot *tgbotapi.BotAPI, chatID int64, text string) {
 	}
 }
 
-func HandleMessage(bot *BotApi.BotAPI, store *storage.Storage, message *tgbotapi.Message) {
+func HandleMessage(bot *tgbotapi.BotAPI, store *storage.Storage, message *tgbotapi.Message) {
 	chatId := message.Chat.ID
 	text := strings.TrimSpace(message.Text)
 

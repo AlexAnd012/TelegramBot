@@ -41,10 +41,17 @@ type ChatSettings struct {
 	DailyReportTime *time.Time
 }
 
+type ChatDigestSlot struct {
+	ChatID   int64
+	TimeZone string
+	Daily    time.Time
+}
+
 type ChatSettingsRepo interface {
 	Get(ctx context.Context, chatID int64) (ChatSettings, error)
 	UpsertTZ(ctx context.Context, chatID int64, tz string) error
 	UpsertDigest(ctx context.Context, chatID int64, t *time.Time) error
+	ChatsToDigestNow(ctx context.Context) ([]ChatDigestSlot, error)
 }
 
 type chatSettingsPG struct{ db *pgxpool.Pool }
@@ -59,6 +66,33 @@ func (r *chatSettingsPG) Get(ctx context.Context, chatID int64) (ChatSettings, e
 	var cs ChatSettings
 	err := r.db.QueryRow(ctx, q, chatID).Scan(&cs.ChatID, &cs.TimeZone, &cs.LocaleLanguage, &cs.DailyReportTime)
 	return cs, err
+}
+
+func (r *chatSettingsPG) ChatsToDigestNow(ctx context.Context) ([]ChatDigestSlot, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	const q = `
+        SELECT chat_id, time_zone, daily_report_time
+        FROM chat_settings
+        WHERE daily_report_time IS NOT NULL
+    `
+
+	rows, err := r.db.Query(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ChatDigestSlot
+	for rows.Next() {
+		var s ChatDigestSlot
+		if err := rows.Scan(&s.ChatID, &s.TimeZone, &s.Daily); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 func (r *chatSettingsPG) UpsertTZ(ctx context.Context, chatID int64, tz string) error {
