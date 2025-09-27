@@ -12,9 +12,6 @@ import (
 var months = map[string]time.Month{
 	"январ": 1, "феврал": 2, "март": 3, "апрел": 4, "ма": 5, "июн": 6, "июл": 7, "август": 8, "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12,
 }
-var weekdays = map[string]time.Weekday{
-	"пн": time.Monday, "вт": time.Tuesday, "ср": time.Wednesday, "чт": time.Thursday, "пт": time.Friday, "сб": time.Saturday, "вс": time.Sunday,
-}
 
 type Parsed struct {
 	Title       string
@@ -26,7 +23,24 @@ type Parsed struct {
 func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 	loc := storage.LoadUserLocation(tz)
 	low := strings.ToLower(strings.TrimSpace(input))
-	lead := 15
+
+	lead := 30
+	reLead := regexp.MustCompile(`\bза\s+(\d+)\s*(мин(?:ут[аы]?|)|м|ч(?:ас(?:а|ов)?)?)?\b`)
+	if m := reLead.FindStringSubmatch(low); len(m) >= 2 {
+		n := toInt(m[1])
+		unit := ""
+		if len(m) >= 3 {
+			unit = m[2]
+		}
+		switch {
+		case unit == "" || strings.HasPrefix(unit, "м"):
+			lead = n
+		case strings.HasPrefix(unit, "ч"):
+			lead = n * 60
+		}
+		low = strings.Replace(low, m[0], "", 1)
+		low = strings.TrimSpace(low)
+	}
 
 	reRel := regexp.MustCompile(`\b(сегодня|завтра|послезавтра)\b(?:[^0-9]{0,10}(\d{1,2})[:.](\d{2}))?`)
 	if m := reRel.FindStringSubmatch(low); len(m) >= 2 {
@@ -54,7 +68,7 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 		return &Parsed{Title: title, DueUTC: &utc, LeadMinutes: lead}, nil
 	}
 
-	reDate := regexp.MustCompile(`\b(\d{1,2})\s+([а-я]+)\s+(\d{1,2})[:.](\d{2})\b`)
+	reDate := regexp.MustCompile(`\b(\d{1,2})\s+([а-яё]+)\s+(\d{1,2})[:.](\d{2})\b`)
 	if m := reDate.FindStringSubmatch(low); len(m) == 5 {
 		day := toInt(m[1])
 		mon := detectMonth(m[2])
@@ -71,8 +85,10 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 			return &Parsed{Title: title, DueUTC: &utc, LeadMinutes: lead}, nil
 		}
 	}
+
 	reWD := regexp.MustCompile(`\b(по|каждый|каждое)?\s*(?:в|во)?\s*(понедельник|вторник|среда|среду|четверг|пятница|пятницу|суббота|субботу|воскресенье)\b(?:[^0-9]{0,10}(\d{1,2})[:.](\d{2}))?`)
 	if m := reWD.FindStringSubmatch(low); len(m) >= 4 {
+
 		wd := map[string]time.Weekday{
 			"понедельник": time.Monday,
 			"вторник":     time.Tuesday,
@@ -104,8 +120,13 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 
 		if weekly {
 			byday := map[time.Weekday]string{
-				time.Monday: "MO", time.Tuesday: "TU", time.Wednesday: "WE",
-				time.Thursday: "TH", time.Friday: "FR", time.Saturday: "SA", time.Sunday: "SU",
+				time.Monday:    "MO",
+				time.Tuesday:   "TU",
+				time.Wednesday: "WE",
+				time.Thursday:  "TH",
+				time.Friday:    "FR",
+				time.Saturday:  "SA",
+				time.Sunday:    "SU",
 			}[wd]
 			r := fmt.Sprintf("FREQ=WEEKLY;BYDAY=%s;BYHOUR=%d;BYMINUTE=%d", byday, hh, mm)
 			return &Parsed{Title: title, RRULE: &r, LeadMinutes: lead}, nil

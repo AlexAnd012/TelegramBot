@@ -25,7 +25,7 @@ func HandleMessage(bot *tgbotapi.BotAPI, store *storage.Storage, message *tgbota
 
 	switch {
 	case strings.HasPrefix(text, "/start"):
-		Reply(bot, chatId, "Привет! Я — твой персональный помощник и ассистент от Александра.\nУ меня есть несколько команд, которые я могу выполнить:\n• /timezone — установить часовой пояс\n• /report 20:00 — включить ежедневный отчёт \n• /list today | week | all — показать запланированные дела\n• /timetable — задать расписание\nА ещё можно просто написать: «во вторник в 14:00 встреча» и я напомню тебе о ней")
+		Reply(bot, chatId, "Привет! Я — твой персональный помощник и ассистент от Александра.\nУ меня есть несколько команд, которые я могу выполнить:\n• /timezone — установить часовой пояс\n• /report 20:00 — включить ежедневный отчёт \n• /list today | week | all — показать запланированные дела\n• /timetable — задать расписание\nА ещё можно просто написать: «во вторник в 14:00 встреча за 30 минут» и я напомню тебе о ней")
 
 	case strings.HasPrefix(text, "/timezone"):
 		timezone := strings.TrimSpace(strings.TrimPrefix(text, "/timezone"))
@@ -226,6 +226,9 @@ func HandleNaturalReminder(bot *tgbotapi.BotAPI, store *storage.Storage, m *tgbo
 			return
 		}
 		fire := p.DueUTC.Add(-time.Duration(p.LeadMinutes) * time.Minute)
+		if fire.Before(time.Now().UTC()) {
+			fire = time.Now().UTC()
+		}
 		_ = store.Jobs().Create(ctx, id, fire)
 
 		loc := storage.LoadUserLocation(tz)
@@ -235,13 +238,17 @@ func HandleNaturalReminder(bot *tgbotapi.BotAPI, store *storage.Storage, m *tgbo
 	}
 
 	if p.RRULE != nil {
-		next := storage.NextFromWeeklyRRULE(*p.RRULE, tz, time.Now()) // уже UTC после правки выше
+		next := storage.NextFromWeeklyRRULE(*p.RRULE, tz, time.Now())
 		id, err := store.Reminders().AddRecurring(ctx, chatID, p.Title, p.LeadMinutes, *p.RRULE, next)
 		if err != nil {
 			Reply(bot, chatID, "Не смог сохранить повторяющееся напоминание ")
 			return
 		}
-		_ = store.Jobs().Create(ctx, id, next.Add(-time.Duration(p.LeadMinutes)*time.Minute))
+		fire := next.Add(-time.Duration(p.LeadMinutes) * time.Minute)
+		if fire.Before(time.Now().UTC()) {
+			fire = time.Now().UTC()
+		}
+		_ = store.Jobs().Create(ctx, id, fire)
 
 		loc := storage.LoadUserLocation(tz)
 		Reply(bot, chatID, fmt.Sprintf("Ок! Каждую неделю. Ближайшее: %s — %s",
