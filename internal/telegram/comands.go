@@ -23,8 +23,6 @@ func HandleMessage(bot *tgbotapi.BotAPI, store *storage.Storage, message *tgbota
 	chatId := message.Chat.ID
 	text := strings.TrimSpace(message.Text)
 
-	_ = store.ChatSettings().UpsertTZ(context.Background(), chatId, "UTC")
-
 	switch {
 	case strings.HasPrefix(text, "/start"):
 		Reply(bot, chatId, "Привет! Я — твой персональный помощник и ассистент от Александра.\nУ меня есть несколько команд, которые я могу выполнить:\n• /timezone — установить часовой пояс\n• /report 20:00 — включить ежедневный отчёт \n• /list today | week | all — показать запланированные дела\n• /timetable — задать расписание\nА ещё можно просто написать: «во вторник в 14:00 встреча» и я напомню тебе о ней")
@@ -237,7 +235,7 @@ func HandleNaturalReminder(bot *tgbotapi.BotAPI, store *storage.Storage, m *tgbo
 	}
 
 	if p.RRULE != nil {
-		next := storage.NextFromWeeklyRRULE(*p.RRULE, tz, time.Now())
+		next := storage.NextFromWeeklyRRULE(*p.RRULE, tz, time.Now()) // уже UTC после правки выше
 		id, err := store.Reminders().AddRecurring(ctx, chatID, p.Title, p.LeadMinutes, *p.RRULE, next)
 		if err != nil {
 			Reply(bot, chatID, "Не смог сохранить повторяющееся напоминание ")

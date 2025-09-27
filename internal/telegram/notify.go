@@ -62,9 +62,11 @@ func (n *Notifier) processDueJobs() {
 
 		if j.ReminderRule != nil && *j.ReminderRule != "" {
 			cs, _ := n.Store.ChatSettings().Get(context.Background(), j.ChatID)
-			next := NextFromWeeklyRRULE(*j.ReminderRule, cs.TimeZone, time.Now())
-			_ = n.Store.Reminders().UpdateNextReport(context.Background(), j.ReminderID, &next)
-			_ = n.Store.Jobs().Create(context.Background(), j.ReminderID, next.Add(-time.Duration(j.ReminderTime)*time.Minute))
+			next := storage.NextFromWeeklyRRULE(*j.ReminderRule, cs.TimeZone, time.Now())
+			nextUTC := next.UTC()
+			_ = n.Store.Reminders().UpdateNextReport(context.Background(), j.ReminderID, &nextUTC)
+			fireUTC := nextUTC.Add(-time.Duration(j.ReminderTime) * time.Minute)
+			_ = n.Store.Jobs().Create(context.Background(), j.ReminderID, fireUTC)
 		}
 	}
 }
@@ -89,7 +91,7 @@ func (n *Notifier) processDailyDigests() {
 		)
 
 		diff := nowLocal.Sub(target)
-		if diff < -1*time.Minute || diff > 1*time.Minute {
+		if diff < -3*time.Minute || diff > 3*time.Minute {
 			continue
 		}
 
@@ -152,7 +154,7 @@ func NextFromWeeklyRRULE(rrule, tz string, from time.Time) time.Time {
 	byday := parts["BYDAY"]
 	hour, _ := strconv.Atoi(parts["BYHOUR"])
 	min, _ := strconv.Atoi(parts["BYMINUTE"])
-	want := map[string]time.Weekday{"ПН": time.Monday, "ВТ": time.Tuesday, "СР": time.Wednesday, "ЧТ": time.Thursday, "ПТ": time.Friday, "СБ": time.Saturday, "ВС": time.Sunday}[byday]
+	want := map[string]time.Weekday{"MN": time.Monday, "TU": time.Tuesday, "WE": time.Wednesday, "TH": time.Thursday, "FR": time.Friday, "SA": time.Saturday, "SU": time.Sunday}[byday]
 
 	loc := storage.LoadUserLocation(tz)
 	now := from.In(loc)

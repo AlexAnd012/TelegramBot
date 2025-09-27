@@ -471,9 +471,10 @@ func NextFromWeeklyRRULE(rrule string, tz string, now time.Time) time.Time {
 		}
 	}
 
-	candidate := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, loc)
-	for candidate.Weekday() != weekday || !candidate.After(now) {
+	nowLocal := now.In(loc)
+	candidate := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), hour, min, 0, 0, loc)
+	for candidate.Weekday() != weekday || !candidate.After(nowLocal) {
 		candidate = candidate.AddDate(0, 0, 1)
 	}
-	return candidate
+	return candidate.UTC()
 }
