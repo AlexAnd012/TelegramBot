@@ -246,7 +246,7 @@ func HandleNaturalReminder(bot *tgbotapi.BotAPI, store *storage.Storage, m *tgbo
 
 	p, err := timeparse.ParseRU(m.Text, tz, time.Now())
 	if err != nil {
-		Reply(bot, chatID, "Не понял дату/время \nПримеры:\n• 25 сентября 14:00 встреча\n• во вторник 18:00 спортзал\n• /add 2025-09-30 14:00 Встреча")
+		Reply(bot, chatID, "Не понял дату/время \nПримеры:\n• 25 сентября 14:00 встреча за 1 час \n• во вторник 18:00 спортзал за 2 часа \n• /add 2025-09-30 14:00 Встреча")
 		return
 	}
 
