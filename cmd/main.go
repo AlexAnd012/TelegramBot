@@ -15,10 +15,8 @@ import (
 )
 
 func main() {
-	// загрузка конфига
 	cfg := config.Load()
 
-	// запуска бота
 	bot, err := tgbotapi.NewBotAPI(cfg.BotToken)
 	if err != nil {
 		log.Fatal(err)
@@ -35,7 +33,6 @@ func main() {
 		log.Printf("setMyCommands: %v", err)
 	}
 
-	// бд
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	store, err := storage.New(ctx, cfg.DBUrl)
@@ -47,7 +44,7 @@ func main() {
 	if _, err := store.Now(ctx); err != nil {
 		log.Fatalf("db ping failed: %v", err)
 	}
-	// webhook
+
 	params := tgbotapi.Params{}
 	params.AddNonEmpty("url", cfg.SelfURL+"/webhook")
 	params.AddNonEmpty("secret_token", cfg.WebhookSecret)
@@ -68,13 +65,11 @@ func main() {
 			}
 		}(i)
 	}
-	// запускаем notifier
+
 	notifier := &telegram.Notifier{Bot: bot, Store: store}
 	go notifier.Run(context.Background())
 
-	// HTTP сервер
 	handler := httpserver.New(cfg.WebhookSecret, updates)
-
 	log.Printf("HTTP server listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
 		log.Fatalf("http server error: %v", err)

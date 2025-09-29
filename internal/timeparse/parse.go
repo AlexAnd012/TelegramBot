@@ -20,19 +20,11 @@ type Parsed struct {
 	RRULE       *string
 }
 
-// ParseRU разбирает русскоязычные фразы про дату/время и lead.
-// Поддерживает:
-//   - "за 30 минут" / "за 2 часа" (lead; по умолчанию 30 минут);
-//   - "сегодня|завтра|послезавтра [HH:MM] <текст>";
-//   - "DD <месяц-рус> [в] HH:MM <текст>" (напр. "27 сентября в 22:40 встреча");
-//   - "YYYY-MM-DD HH:MM <текст>" (ISO);
-//   - "[по|каждый|каждое] <день недели> [HH:MM] <текст>" — разово или еженедельно (RRULE).
 func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 	loc := storage.LoadUserLocation(tz)
 	low := strings.ToLower(strings.TrimSpace(input))
 
-	// --- lead: "за 30 минут"/"за 2 часа"/"за 5 мин"/"за 1 ч"
-	lead := 30 // дефолт — 30 минут
+	lead := 30
 	reLead := regexp.MustCompile(`\bза\s+(\d+)\s*(мин(?:ут[а-я]*)?|м|ч(?:ас(?:а|ов)?)?)?\b`)
 	if m := reLead.FindStringSubmatch(low); len(m) >= 2 {
 		n := toInt(m[1])
@@ -41,17 +33,15 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 			unit = m[2]
 		}
 		switch {
-		case unit == "" || strings.HasPrefix(unit, "м"): // мин, минуты, м
+		case unit == "" || strings.HasPrefix(unit, "м"):
 			lead = n
-		case strings.HasPrefix(unit, "ч"): // ч, час, часа, часов
+		case strings.HasPrefix(unit, "ч"):
 			lead = n * 60
 		}
-		// убрать фрагмент "за N ..." из текста, чтобы не мешал парсингу дат
 		low = strings.Replace(low, m[0], "", 1)
 		low = strings.TrimSpace(low)
 	}
 
-	// --- относительные дни: сегодня/завтра/послезавтра [HH:MM]
 	reRel := regexp.MustCompile(`\b(сегодня|завтра|послезавтра)\b(?:[^0-9]{0,10}(\d{1,2})[:.](\d{2}))?`)
 	if m := reRel.FindStringSubmatch(low); len(m) >= 2 {
 		base := now.In(loc)
@@ -67,7 +57,6 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 			mm = toInt(m[3])
 		}
 		local := time.Date(base.Year(), base.Month(), base.Day(), hh, mm, 0, 0, loc)
-		// если получилось в прошлом — сместим на следующий день
 		if !local.After(now.In(loc)) {
 			local = local.Add(24 * time.Hour)
 		}
@@ -79,8 +68,6 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 		return &Parsed{Title: title, DueUTC: &utc, LeadMinutes: lead}, nil
 	}
 
-	// --- конкретная дата: "DD <месяц-рус> [в] HH:MM"
-	// допускаем запятую, разные пробелы и "22.40" вместо "22:40"
 	reDate := regexp.MustCompile(`\b(\d{1,2})\s+([а-яё]+)\s*(?:,)?\s*(?:в\s*)?(\d{1,2})[:.](\d{2})\b`)
 	if m := reDate.FindStringSubmatch(low); len(m) == 5 {
 		day := toInt(m[1])
@@ -99,7 +86,6 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 		}
 	}
 
-	// --- ISO: "YYYY-MM-DD HH:MM"
 	reISO := regexp.MustCompile(`\b(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2})[:.](\d{2})\b`)
 	if m := reISO.FindStringSubmatch(low); len(m) == 6 {
 		y := toInt(m[1])
@@ -116,7 +102,6 @@ func ParseRU(input, tz string, now time.Time) (*Parsed, error) {
 		return &Parsed{Title: title, DueUTC: &utc, LeadMinutes: lead}, nil
 	}
 
-	// --- день недели: "[по|каждый||каждую|каждое]? <день недели> [HH:MM]"
 	reWD := regexp.MustCompile(`\b(по|каждый|каждое)?\s*(?:в|во)?\s*(понедельник|вторник|среда|среду|четверг|пятница|пятницу|суббота|субботу|воскресенье)\b(?:[^0-9]{0,10}(\d{1,2})[:.](\d{2}))?`)
 	if m := reWD.FindStringSubmatch(low); len(m) >= 4 {
 		wd := map[string]time.Weekday{
