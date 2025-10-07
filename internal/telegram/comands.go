@@ -124,11 +124,13 @@ func HandleList(bot *tgbotapi.BotAPI, store *storage.Storage, chatID int64, arg 
 		dow := int(now.Weekday())
 		if dow == 0 {
 			dow = 7
-			start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, -(dow - 1))
-			end := start.AddDate(0, 0, 7)
-			f, t := start.UTC(), end.UTC()
-			fromUTC, toUTC = &f, &t
 		}
+		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).
+			AddDate(0, 0, -(dow - 1))
+		end := start.AddDate(0, 0, 7)
+
+		f, t := start.UTC(), end.UTC()
+		fromUTC, toUTC = &f, &t
 	case "all", "все":
 		f := time.Now().UTC()
 		fromUTC = &f
@@ -138,6 +140,11 @@ func HandleList(bot *tgbotapi.BotAPI, store *storage.Storage, chatID int64, arg 
 	}
 
 	log.Printf("[/list] chat=%d tz=%s arg=%s from=%v to=%v", chatID, tz, arg, fromUTC, toUTC)
+
+	if fromUTC == nil {
+		Reply(bot, chatID, "Не смог определить диапазон /list")
+		return
+	}
 
 	items, err := store.Reminders().GetUpcoming(ctx, chatID, *fromUTC, toUTC, 50)
 	if err != nil {
