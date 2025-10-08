@@ -37,7 +37,8 @@ func main() {
 	defer cancel()
 	store, err := storage.New(ctx, cfg.DBUrl)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("store failed: %v", err)
+
 	}
 	defer store.Close()
 
