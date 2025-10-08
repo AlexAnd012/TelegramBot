@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -16,6 +19,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	dsn := os.Getenv("DATABASE_URL")
+	u, _ := url.Parse(dsn)
+	log.Printf("DB host=%s port=%s db=%s", u.Hostname(), u.Port(), strings.TrimPrefix(u.Path, "/"))
 
 	bot, err := tgbotapi.NewBotAPI(cfg.BotToken)
 	if err != nil {
@@ -42,8 +48,11 @@ func main() {
 	}
 	defer store.Close()
 
-	if _, err := store.Now(ctx); err != nil {
-		log.Fatalf("db ping failed: %v", err)
+	if err := waitForDB(context.Background(), func(c context.Context) error {
+		_, err := store.Now(c)
+		return err
+	}); err != nil {
+		log.Fatalf("db not ready: %v", err)
 	}
 
 	params := tgbotapi.Params{}
@@ -83,4 +92,26 @@ func HandleUpdate(bot *tgbotapi.BotAPI, update tgbotapi.Update, store *storage.S
 		telegram.HandleMessage(bot, store, update.Message)
 		return
 	}
+}
+
+func waitForDB(ctx context.Context, ping func(context.Context) error) error {
+	backoff := []time.Duration{
+		500 * time.Millisecond,
+		1 * time.Second,
+		2 * time.Second,
+		4 * time.Second,
+		8 * time.Second,
+		15 * time.Second,
+	}
+	for i, d := range backoff {
+		c, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err := ping(c)
+		cancel()
+		if err == nil {
+			return nil
+		}
+		log.Printf("db ping failed (%d/%d): %v — retry in %v", i+1, len(backoff), err, d)
+		time.Sleep(d)
+	}
+	return fmt.Errorf("database not reachable after retries")
 }
